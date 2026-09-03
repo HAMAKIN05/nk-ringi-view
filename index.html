@@ -42,6 +42,7 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
 .reject .send{background:var(--red);margin-top:6px}.reject .cancel{background:var(--muted);margin-top:6px}
 .done{margin-top:8px;padding:8px;border-radius:8px;background:#ecfdf5;color:var(--green);font-size:13px}
 .done.err{background:#fef2f2;color:var(--red)}
+.card.focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.25)}
 .empty{text-align:center;color:var(--muted);padding:40px 0}
 .foot{text-align:center;font-size:12px;color:var(--muted);margin-top:16px}
 </style>
@@ -95,7 +96,7 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
       ? '<div class="acts"' + (canAct ? '' : ' hidden') + '><button class="ok" data-id="' + esc(i.pageId) + '">承認する</button><button class="ng" data-id="' + esc(i.pageId) + '">否認する</button></div>' +
         '<div class="reject" hidden><textarea placeholder="否認理由を入力" rows="2"></textarea><button class="send" data-id="' + esc(i.pageId) + '">否認を送信</button><button class="cancel">やめる</button></div>'
       : '';
-    return '<article class="card" data-state="' + i.state + '" data-text="' + esc((i.name + ' ' + i.purpose + ' ' + i.detail + ' ' + i.category).toLowerCase()) + '">' +
+    return '<article class="card" data-state="' + i.state + '" data-page="' + esc(i.pageId) + '" data-text="' + esc((i.name + ' ' + i.purpose + ' ' + i.detail + ' ' + i.category).toLowerCase()) + '">' +
       '<header><span class="badge ' + i.state + '">' + LABEL[i.state] + '</span><span class="id">#' + esc(i.id) + '</span><span class="date">' + esc(i.created) + '</span></header>' +
       '<h2>' + esc(i.name) + '<span class="amount">' + esc(i.amount) + '</span></h2>' +
       (i.category ? '<div class="cat">' + esc(i.category) + '</div>' : '') +
@@ -110,7 +111,19 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
     LIST.innerHTML = items.map(card).join('');
     var count = function (s) { return items.filter(function (i) { return i.state === s; }).length; };
     TABS.forEach(function (b) { var f = b.dataset.f; b.textContent = (f === 'all' ? 'すべて' : LABEL[f]) + ' ' + (f === 'all' ? items.length : count(f)); });
-    bind(); apply();
+    bind(); apply(); focusTarget();
+  }
+  var focused = false;
+  function focusTarget() {
+    if (focused) return;
+    var pid = new URLSearchParams(location.search).get('page');
+    if (!pid) return;
+    var el = document.querySelector('.card[data-page="' + pid.replace(/"/g, '') + '"]');
+    if (!el) return;
+    focused = true;
+    if (el.dataset.state !== filter) { filter = 'all'; TABS.forEach(function (x) { x.classList.toggle('on', x.dataset.f === 'all'); }); apply(); }
+    el.classList.add('focus');
+    setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
   }
   function apply() {
     var n = 0;
