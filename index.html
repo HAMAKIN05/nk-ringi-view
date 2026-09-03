@@ -69,7 +69,7 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
 (function () {
   // ▼ 設定（n8n側と合わせる）
   var LIFF_ID = '2011405015-rVRh0Mhq';
-  var API = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-data?k=nk2026';
+  var API = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-data';
   var ACTION = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-view-action';
   var ME = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-me';
 
@@ -138,10 +138,13 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
   document.querySelector('.search').oninput = function (e) { query = e.target.value.trim().toLowerCase(); apply(); };
 
   function load() {
-    return fetch(API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d.ok) throw new Error(d.message || 'data');
-      items = d.items; FOOT.textContent = '更新 ' + d.updated; render();
-    }).catch(function (e) { say('データを取得できませんでした: ' + e.message); });
+    var token = (window.liff && liff.isLoggedIn && liff.isLoggedIn()) ? liff.getIDToken() : '';
+    if (!token) { EMPTY.textContent = 'LINEでログインすると一覧が表示されます'; EMPTY.hidden = false; return Promise.resolve(); }
+    return fetch(API, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) })
+      .then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) { EMPTY.textContent = d.message || '一覧を表示できません'; EMPTY.hidden = false; return; }
+        items = d.items; FOOT.textContent = '更新 ' + d.updated; render();
+      }).catch(function (e) { say('データを取得できませんでした: ' + e.message); });
   }
 
   function post(cardEl, body) {
