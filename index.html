@@ -71,6 +71,7 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
   var LIFF_ID = '2011405015-rVRh0Mhq';
   var API = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-data?k=nk2026';
   var ACTION = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-view-action';
+  var ME = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-me';
 
   var W = document.querySelector('.who');
   var LIST = document.getElementById('list');
@@ -179,7 +180,16 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
         W.querySelector('.login').onclick = function () { liff.login({ redirectUri: location.href }); };
         return;
       }
-      return liff.getProfile().then(function (p) { canAct = true; say('LINE: ' + p.displayName + ' として操作します'); });
+      return liff.getProfile().then(function (p) {
+        say('LINE: ' + p.displayName + '（権限を確認中…）');
+        return fetch(ME, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: liff.getIDToken() }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (j.ok && j.canAct) { canAct = true; say('LINE: ' + p.displayName + ' として承認・否認できます'); }
+            else { canAct = false; say('LINE: ' + p.displayName + '（閲覧のみ・承認権限なし）'); }
+          })
+          .catch(function () { canAct = false; say('LINE: ' + p.displayName + '（権限を確認できませんでした・閲覧のみ）'); });
+      });
     }).catch(function (e) { say('LINE連携エラー: ' + (e && (e.message || e.code) || e)); });
   }
 
