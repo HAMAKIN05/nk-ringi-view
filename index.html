@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>NK稟議書 申請一覧</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--blue:#2563eb;--green:#059669;--red:#dc2626;--amber:#b45309}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;line-height:1.5}
+.top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 12px;z-index:2}
+.top h1{font-size:16px;margin:0 0 8px}
+.tabs{display:flex;gap:6px}
+.tabs button{flex:1;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 4px;font-size:13px;color:var(--muted)}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.search{width:100%;margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:15px}
+.who{font-size:12px;color:var(--muted);margin-top:6px}
+.login{padding:6px 12px;border:0;border-radius:999px;background:#06c755;color:#fff;font-weight:600;font-size:13px}
+main{padding:10px 12px 40px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.card header{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.card .date{margin-left:auto}
+.badge{padding:2px 8px;border-radius:999px;font-weight:600;color:#fff;font-size:12px}
+.badge.pending{background:var(--amber)}.badge.approved{background:var(--green)}.badge.rejected{background:var(--red)}
+h2{font-size:17px;margin:6px 0 2px;display:flex;justify-content:space-between;gap:8px}
+.amount{font-weight:600;white-space:nowrap}
+.cat{font-size:13px;color:var(--blue);margin-bottom:4px}
+.row{display:flex;gap:8px;margin:3px 0}
+.k{flex:0 0 4.5em;color:var(--muted);font-size:13px}
+.warn{color:var(--amber);font-weight:600}
+details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}details p{margin:4px 0 0;white-space:pre-wrap}
+.files{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.file{display:inline-block;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:#f9fafb;color:var(--blue);text-decoration:none;font-size:13px}
+.file.muted{color:var(--muted)}
+.acts{display:flex;gap:8px;margin-top:10px}
+.acts button,.reject button{flex:1;padding:10px;border:0;border-radius:8px;font-size:15px;font-weight:600;color:#fff}
+.acts .ok{background:var(--green)}.acts .ng{background:var(--red)}
+.reject{margin-top:8px}
+.reject textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:15px}
+.reject .send{background:var(--red);margin-top:6px}.reject .cancel{background:var(--muted);margin-top:6px}
+.done{margin-top:8px;padding:8px;border-radius:8px;background:#ecfdf5;color:var(--green);font-size:13px}
+.done.err{background:#fef2f2;color:var(--red)}
+.empty{text-align:center;color:var(--muted);padding:40px 0}
+.foot{text-align:center;font-size:12px;color:var(--muted);margin-top:16px}
+</style>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+<div class="top">
+  <h1>NK稟議書 申請一覧</h1>
+  <div class="tabs">
+    <button data-f="pending" class="on">承認待ち</button>
+    <button data-f="approved">承認済</button>
+    <button data-f="rejected">否認済</button>
+    <button data-f="all">すべて</button>
+  </div>
+  <input class="search" type="search" placeholder="氏名・目的・内容で検索">
+  <div class="who">読み込み中…</div>
+</div>
+<main>
+  <div id="list"></div>
+  <div class="empty" hidden>該当なし</div>
+  <div class="foot"></div>
+</main>
+<script>
+(function () {
+  // ▼ 設定（n8n側と合わせる）
+  var LIFF_ID = '2010919215-PxH05Dyi';
+  var API = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-data?k=nk2026';
+  var ACTION = 'https://n8n.srv1073523.hstgr.cloud/webhook/nk-ringi-view-action';
+
+  var W = document.querySelector('.who');
+  var LIST = document.getElementById('list');
+  var EMPTY = document.querySelector('.empty');
+  var FOOT = document.querySelector('.foot');
+  var TABS = document.querySelectorAll('.tabs button');
+  var filter = 'pending', query = '', canAct = false, items = [];
+  var LABEL = { pending: '承認待ち', approved: '承認済', rejected: '否認済' };
+
+  function say(t) { W.textContent = t; W.hidden = false; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function row(k, v, cls) { return '<div class="row"><span class="k">' + k + '</span><span' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</span></div>'; }
+
+  function card(i) {
+    var files = i.links.length
+      ? i.links.map(function (l) { return '<a class="file" href="' + esc(l.url) + '" target="_blank" rel="noopener">📎 ' + esc(l.name) + '</a>'; }).join('')
+      : i.fileNames.map(function (n) { return '<span class="file muted">📎 ' + esc(n) + '（リンク準備中）</span>'; }).join('');
+    var status = '';
+    if (i.state === 'pending') status = row('承認済', esc(i.approved.join('、')) || '—') + row('承認待ち', esc(i.pending.join('、') || 'なし'), 'warn');
+    if (i.state === 'approved') status = row('承認者', esc(i.approved.join('、'))) + row('承認日時', esc(i.approvedAt));
+    if (i.state === 'rejected') status = row('否認者', esc(i.rejecter)) + row('否認日時', esc(i.rejectedAt)) + row('理由', esc(i.reason));
+    var acts = i.state === 'pending'
+      ? '<div class="acts"' + (canAct ? '' : ' hidden') + '><button class="ok" data-id="' + esc(i.pageId) + '">承認する</button><button class="ng" data-id="' + esc(i.pageId) + '">否認する</button></div>' +
+        '<div class="reject" hidden><textarea placeholder="否認理由を入力" rows="2"></textarea><button class="send" data-id="' + esc(i.pageId) + '">否認を送信</button><button class="cancel">やめる</button></div>'
+      : '';
+    return '<article class="card" data-state="' + i.state + '" data-text="' + esc((i.name + ' ' + i.purpose + ' ' + i.detail + ' ' + i.category).toLowerCase()) + '">' +
+      '<header><span class="badge ' + i.state + '">' + LABEL[i.state] + '</span><span class="id">#' + esc(i.id) + '</span><span class="date">' + esc(i.created) + '</span></header>' +
+      '<h2>' + esc(i.name) + '<span class="amount">' + esc(i.amount) + '</span></h2>' +
+      (i.category ? '<div class="cat">' + esc(i.category) + '</div>' : '') +
+      row('目的', esc(i.purpose)) +
+      (i.detail ? '<details><summary>稟議内容</summary><p>' + esc(i.detail) + '</p></details>' : '') +
+      (i.due ? row('期日', esc(i.due)) : '') +
+      (i.note ? row('備考', esc(i.note)) : '') +
+      status + (files ? '<div class="files">' + files + '</div>' : '') + acts + '</article>';
+  }
+
+  function render() {
+    LIST.innerHTML = items.map(card).join('');
+    var count = function (s) { return items.filter(function (i) { return i.state === s; }).length; };
+    TABS.forEach(function (b) { var f = b.dataset.f; b.textContent = (f === 'all' ? 'すべて' : LABEL[f]) + ' ' + (f === 'all' ? items.length : count(f)); });
+    bind(); apply();
+  }
+  function apply() {
+    var n = 0;
+    document.querySelectorAll('.card').forEach(function (c) {
+      var v = (filter === 'all' || c.dataset.state === filter) && (!query || c.dataset.text.indexOf(query) >= 0);
+      c.hidden = !v; if (v) n++;
+    });
+    EMPTY.hidden = n > 0;
+  }
+  TABS.forEach(function (b) { b.onclick = function () { TABS.forEach(function (x) { x.classList.remove('on'); }); b.classList.add('on'); filter = b.dataset.f; apply(); }; });
+  document.querySelector('.search').oninput = function (e) { query = e.target.value.trim().toLowerCase(); apply(); };
+
+  function load() {
+    return fetch(API, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) throw new Error(d.message || 'data');
+      items = d.items; FOOT.textContent = '更新 ' + d.updated; render();
+    }).catch(function (e) { say('データを取得できませんでした: ' + e.message); });
+  }
+
+  function post(cardEl, body) {
+    var d = document.createElement('div'); d.className = 'done'; d.textContent = '送信中…'; cardEl.appendChild(d);
+    cardEl.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    fetch(ACTION, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ idToken: liff.getIDToken() }, body)) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.ok) { d.textContent = '受け付けました。結果はLINEグループに届きます。'; setTimeout(load, 4000); }
+        else { d.className = 'done err'; d.textContent = j.message || '処理できませんでした'; cardEl.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); }
+      })
+      .catch(function () { d.className = 'done err'; d.textContent = '通信エラー'; cardEl.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); });
+  }
+
+  function bind() {
+    document.querySelectorAll('.card').forEach(function (c) {
+      var ok = c.querySelector('.ok'), ng = c.querySelector('.ng'), rj = c.querySelector('.reject');
+      if (!ok) return;
+      ok.onclick = function () { if (confirm('この申請を承認しますか？')) post(c, { action: 'approve', pageId: ok.dataset.id }); };
+      ng.onclick = function () { rj.hidden = false; c.querySelector('.acts').hidden = true; rj.querySelector('textarea').focus(); };
+      rj.querySelector('.cancel').onclick = function () { rj.hidden = true; c.querySelector('.acts').hidden = false; };
+      rj.querySelector('.send').onclick = function () {
+        var r = rj.querySelector('textarea').value.trim();
+        if (!r) { alert('否認理由を入力してください'); return; }
+        post(c, { action: 'reject', pageId: ng.dataset.id, reason: r });
+      };
+    });
+  }
+
+  // LINE連携
+  function initLine() {
+    if (!window.liff) { say('LINE連携SDKを読み込めませんでした'); return Promise.resolve(); }
+    return liff.init({ liffId: LIFF_ID }).then(function () {
+      if (!liff.isLoggedIn()) {
+        W.innerHTML = '承認・否認するには <button class="login">LINEでログイン</button>'; W.hidden = false;
+        W.querySelector('.login').onclick = function () { liff.login({ redirectUri: location.href }); };
+        return;
+      }
+      return liff.getProfile().then(function (p) { canAct = true; say('LINE: ' + p.displayName + ' として操作します'); });
+    }).catch(function (e) { say('LINE連携エラー: ' + (e && (e.message || e.code) || e)); });
+  }
+
+  initLine().then(load);
+})();
+</script>
+</body>
+</html>
