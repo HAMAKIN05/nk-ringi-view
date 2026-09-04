@@ -93,7 +93,7 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
     var status = '';
     if (i.state === 'pending') status = row('承認済', esc(i.approved.join('、')) || '—') + row('承認待ち', esc(i.pending.join('、') || 'なし'), 'warn');
     if (i.state === 'approved' || i.state === 'returning' || i.state === 'returned') status = row('承認者', esc(i.approved.join('、'))) + row('承認日時', esc(i.approvedAt));
-    if (i.state === 'returning') status += row('返却', '未返却', 'warn');
+    if (i.state === 'returning') status += row('返却', i.returnRequestedBy ? '写真で申告あり（' + esc(i.returnRequestedBy) + ' ' + esc(i.returnRequestedAt) + '）確認待ち' : '未返却', 'warn');
     if (i.state === 'returned') status += row('返却確認', esc(i.returnedBy)) + row('返却日時', esc(i.returnedAt));
     if (i.state === 'rejected') status = row('否認者', esc(i.rejecter)) + row('否認日時', esc(i.rejectedAt)) + row('理由', esc(i.reason));
     var acts = i.state === 'pending'
