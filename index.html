@@ -36,7 +36,7 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
 .file.muted{color:var(--muted)}
 .acts{display:flex;gap:8px;margin-top:10px}
 .acts button,.reject button{flex:1;padding:10px;border:0;border-radius:8px;font-size:15px;font-weight:600;color:#fff}
-.acts .ok{background:var(--green)}.acts .ng{background:var(--red)}.acts .rt{background:#d97706}
+.acts .ok{background:var(--green)}.acts .ng{background:var(--red)}.acts .rt{background:#d97706}.acts .rn{background:var(--red)}
 .reject{margin-top:8px}
 .reject textarea{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:15px}
 .reject .send{background:var(--red);margin-top:6px}.reject .cancel{background:var(--muted);margin-top:6px}
@@ -93,14 +93,17 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
     var status = '';
     if (i.state === 'pending') status = row('承認済', esc(i.approved.join('、')) || '—') + row('承認待ち', esc(i.pending.join('、') || 'なし'), 'warn');
     if (i.state === 'approved' || i.state === 'returning' || i.state === 'returned') status = row('承認者', esc(i.approved.join('、'))) + row('承認日時', esc(i.approvedAt));
-    if (i.state === 'returning') status += row('返却', i.returnRequestedBy ? '写真で申告あり（' + esc(i.returnRequestedBy) + ' ' + esc(i.returnRequestedAt) + '）確認待ち' : '未返却', 'warn');
+    if (i.state === 'returning') status += row('返却', i.returnRequestedBy ? '写真で申告あり（' + esc(i.returnRequestedBy) + ' ' + esc(i.returnRequestedAt) + '）確認待ち' : '未返却', 'warn') +
+      (i.returnRejectedBy ? row('返却否認', esc(i.returnRejectedBy) + ' ' + esc(i.returnRejectedAt) + '：' + esc(i.returnRejectedReason)) : '');
     if (i.state === 'returned') status += row('返却確認', esc(i.returnedBy)) + row('返却日時', esc(i.returnedAt));
     if (i.state === 'rejected') status = row('否認者', esc(i.rejecter)) + row('否認日時', esc(i.rejectedAt)) + row('理由', esc(i.reason));
     var acts = i.state === 'pending'
       ? '<div class="acts"' + (canAct ? '' : ' hidden') + '><button class="ok" data-id="' + esc(i.pageId) + '">承認する</button><button class="ng" data-id="' + esc(i.pageId) + '">否認する</button></div>' +
         '<div class="reject" hidden><textarea placeholder="否認理由を入力" rows="2"></textarea><button class="send" data-id="' + esc(i.pageId) + '">否認を送信</button><button class="cancel">やめる</button></div>'
       : i.state === 'returning'
-      ? '<div class="acts"' + (canReturn ? '' : ' hidden') + '><button class="rt" data-id="' + esc(i.pageId) + '">返却済みにする</button></div>'
+      ? '<div class="acts"' + (canReturn ? '' : ' hidden') + '><button class="rt" data-id="' + esc(i.pageId) + '">' + (i.returnRequestedBy ? '返却を承認' : '返却済みにする') + '</button>' +
+        (i.returnRequestedBy ? '<button class="rn" data-id="' + esc(i.pageId) + '">返却を否認</button>' : '') + '</div>' +
+        (i.returnRequestedBy ? '<div class="reject" hidden><textarea placeholder="返却を否認する理由を入力" rows="2"></textarea><button class="rsend" data-id="' + esc(i.pageId) + '">否認を送信</button><button class="cancel">やめる</button></div>' : '')
       : '';
     return '<article class="card" data-state="' + i.state + '" data-page="' + esc(i.pageId) + '" data-text="' + esc((i.name + ' ' + i.purpose + ' ' + (i.detail || '') + ' ' + i.category).toLowerCase()) + '">' +
       '<header><span class="badge ' + i.state + '">' + LABEL[i.state] + '</span><span class="id">#' + esc(i.id) + '</span><span class="date">' + esc(i.created) + '</span></header>' +
@@ -168,7 +171,20 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
   function bind() {
     document.querySelectorAll('.card').forEach(function (c) {
       var rt = c.querySelector('.rt');
-      if (rt) { rt.onclick = function () { if (confirm('返却を確認しましたか？返却済みにします。')) post(c, { action: 'return', pageId: rt.dataset.id }); }; return; }
+      if (rt) {
+        rt.onclick = function () { if (confirm('返却を確認しましたか？返却済みにします。')) post(c, { action: 'return', pageId: rt.dataset.id }); };
+        var rn = c.querySelector('.rn'), rr = c.querySelector('.reject');
+        if (rn && rr) {
+          rn.onclick = function () { rr.hidden = false; c.querySelector('.acts').hidden = true; rr.querySelector('textarea').focus(); };
+          rr.querySelector('.cancel').onclick = function () { rr.hidden = true; c.querySelector('.acts').hidden = false; };
+          rr.querySelector('.rsend').onclick = function () {
+            var r = rr.querySelector('textarea').value.trim();
+            if (!r) { alert('返却を否認する理由を入力してください'); return; }
+            post(c, { action: 'return_reject', pageId: rn.dataset.id, reason: r });
+          };
+        }
+        return;
+      }
       var ok = c.querySelector('.ok'), ng = c.querySelector('.ng'), rj = c.querySelector('.reject');
       if (!ok) return;
       ok.onclick = function () { if (confirm('この申請を承認しますか？')) post(c, { action: 'approve', pageId: ok.dataset.id }); };
