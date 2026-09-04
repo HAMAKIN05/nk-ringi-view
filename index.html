@@ -74,14 +74,17 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
   var LABEL = { pending: '承認待ち', approved: '承認済', rejected: '否認済', returning: '使用前', returned: '返却済' };
   // 利用申請: 使用前＝承認済みで未返却（使用予定リスト）。否認済は「すべて」でのみ見える
   var TAB_KEYS = SCOPE === 'usage' ? ['pending', 'returning', 'returned', 'all'] : ['pending', 'approved', 'rejected', 'all'];
-  document.querySelector('.tabs').innerHTML = TAB_KEYS.map(function (k, i) { return '<button data-f="' + k + '"' + (i === 0 ? ' class="on"' : '') + '>' + (k === 'all' ? 'すべて' : LABEL[k]) + '</button>'; }).join('');
+  // ?tab=returning のようにURLで最初のタブを指定できる（カードの「使用前一覧」ボタン用）
+  var INIT_TAB = new URLSearchParams(location.search).get('tab');
+  if (TAB_KEYS.indexOf(INIT_TAB) < 0) INIT_TAB = TAB_KEYS[0];
+  document.querySelector('.tabs').innerHTML = TAB_KEYS.map(function (k) { return '<button data-f="' + k + '"' + (k === INIT_TAB ? ' class="on"' : '') + '>' + (k === 'all' ? 'すべて' : LABEL[k]) + '</button>'; }).join('');
 
   var W = document.querySelector('.who');
   var LIST = document.getElementById('list');
   var EMPTY = document.querySelector('.empty');
   var FOOT = document.querySelector('.foot');
   var TABS = document.querySelectorAll('.tabs button');
-  var filter = 'pending', query = '', canAct = false, canReturn = false, items = [];
+  var filter = INIT_TAB, query = '', canAct = false, canReturn = false, items = [];
 
   function say(t) { W.textContent = t; W.hidden = false; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
