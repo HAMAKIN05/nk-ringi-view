@@ -105,12 +105,14 @@ details{margin:4px 0}summary{color:var(--muted);font-size:13px;cursor:pointer}de
         (i.returnRequestedBy ? '<button class="rn" data-id="' + esc(i.pageId) + '">返却を否認</button>' : '') + '</div>' +
         (i.returnRequestedBy ? '<div class="reject" hidden><textarea placeholder="返却を否認する理由を入力" rows="2"></textarea><button class="rsend" data-id="' + esc(i.pageId) + '">否認を送信</button><button class="cancel">やめる</button></div>' : '')
       : '';
-    return '<article class="card" data-state="' + i.state + '" data-page="' + esc(i.pageId) + '" data-text="' + esc((i.name + ' ' + i.purpose + ' ' + (i.detail || '') + ' ' + i.category).toLowerCase()) + '">' +
+    return '<article class="card" data-state="' + i.state + '" data-page="' + esc(i.pageId) + '" data-text="' + esc((i.name + ' ' + i.purpose + ' ' + (i.detail || '') + ' ' + i.category + ' ' + (i.bank || '') + ' ' + (i.branch || '')).toLowerCase()) + '">' +
       '<header><span class="badge ' + i.state + '">' + LABEL[i.state] + '</span><span class="id">#' + esc(i.id) + '</span><span class="date">' + esc(i.created) + '</span></header>' +
       '<h2>' + esc(i.name) + (i.amount ? '<span class="amount">' + esc(i.amount) + '</span>' : '') + '</h2>' +
       (i.category ? '<div class="cat">' + esc(i.category) + '</div>' : '') +
+      (i.bank ? row('銀行名', esc(i.bank)) : '') +
+      (i.branch ? row('支店名', esc(i.branch)) : '') +
       row('目的', esc(i.purpose)) +
-      (i.detail ? '<details><summary>稟議内容</summary><p>' + esc(i.detail) + '</p></details>' : '') +
+      (i.detail ? '<details><summary>' + esc(i.detailLabel || '稟議内容') + '</summary><p>' + esc(i.detail) + '</p></details>' : '') +
       (i.due ? row(esc(i.dueLabel || '期日'), esc(i.due)) : '') +
       (i.extra ? row(esc(i.extraLabel || ''), esc(i.extra)) : '') +
       (i.note ? row('備考', esc(i.note)) : '') +
