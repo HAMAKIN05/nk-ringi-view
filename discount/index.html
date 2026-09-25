@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>自費値引き申請一覧</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--blue:#2563eb;--green:#059669;--red:#dc2626;--amber:#b45309}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;line-height:1.5}
+.top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 12px;z-index:2}.top h1{font-size:17px;margin:0 0 8px}.tabs{display:flex;gap:6px}.tabs button{flex:1;border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 4px;font-size:12px;color:var(--muted)}.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}.search{width:100%;margin-top:8px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:15px}.who{font-size:12px;color:var(--muted);margin-top:6px}
+main{padding:10px 12px 40px;max-width:640px;margin:0 auto}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:10px}.card.focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(37,99,235,.22)}.card header{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.card .date{margin-left:auto}.badge{padding:2px 8px;border-radius:999px;font-weight:600;color:#fff;font-size:12px}.badge.pending{background:var(--amber)}.badge.approved{background:var(--green)}.badge.rejected{background:var(--red)}h2{font-size:17px;margin:7px 0 4px;display:flex;justify-content:space-between;gap:8px}.store{font-size:13px;color:var(--blue);margin-bottom:6px}.row{display:flex;gap:8px;margin:4px 0}.k{flex:0 0 8em;color:var(--muted);font-size:13px}.detail{margin:5px 0}.detail summary{color:var(--muted);font-size:13px;cursor:pointer}.detail p{margin:4px 0;white-space:pre-wrap}.acts{display:flex;gap:8px;margin-top:12px}.acts button,.reject button{flex:1;padding:10px;border:0;border-radius:8px;font-size:15px;font-weight:600;color:#fff}.ok{background:var(--green)}.ng,.send{background:var(--red)}.reject{margin-top:8px}.reject textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;font:inherit}.reject .cancel{background:var(--muted);margin-top:6px}.done{margin-top:8px;padding:8px;border-radius:8px;background:#ecfdf5;color:var(--green);font-size:13px}.done.err{background:#fef2f2;color:var(--red)}.empty{text-align:center;color:var(--muted);padding:40px 0}.foot{text-align:center;font-size:12px;color:var(--muted);margin-top:16px}.login{padding:7px 12px;border:0;border-radius:999px;background:#06c755;color:#fff;font-weight:600}
+</style>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+<div class="top"><h1>自費値引き申請一覧</h1><div class="tabs"></div><input class="search" type="search" placeholder="氏名・店舗・内容で検索"><div class="who">LINE確認中…</div></div>
+<main><div id="list"></div><div class="empty" hidden>該当する申請はありません</div><div class="foot"></div></main>
+<script>
+(function(){
+  'use strict';
+  var LIFF_ID='2011405015-rVRh0Mhq';
+  var DATA_API='https://n8n.srv1073523.hstgr.cloud/webhook/jihi-discount-list-data';
+  var ACTION_API='https://n8n.srv1073523.hstgr.cloud/webhook/jihi-discount-list-action';
+  var W=document.querySelector('.who'),LIST=document.getElementById('list'),EMPTY=document.querySelector('.empty'),FOOT=document.querySelector('.foot'),TABS=document.querySelector('.tabs');
+  var token='',items=[],canAct=false,truncated=false,tab='pending',query='',targetPage='';
+  function say(s){W.textContent=s;W.hidden=false}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function money(n){return Number(n||0).toLocaleString('ja-JP')+'円'}
+  function buildTabs(){var defs=[['pending','承認待ち'],['approved','承認済'],['rejected','否認済'],['all','すべて']];TABS.innerHTML=defs.map(function(x){var count=x[0]==='all'?items.length:items.filter(function(i){return i.state===x[0]}).length;return '<button data-tab="'+x[0]+'"'+(tab===x[0]?' class="on"':'')+'>'+x[1]+' '+count+'</button>'}).join('');TABS.querySelectorAll('button').forEach(function(b){b.onclick=function(){tab=b.dataset.tab;render()}})}
+  function card(i){
+    var actions='';
+    if(canAct&&i.state==='pending'&&i.canOperate!==false) actions='<div class="acts"><button class="ok" data-id="'+esc(i.pageId)+'">承認</button><button class="ng" data-id="'+esc(i.pageId)+'">否認</button></div><div class="reject" hidden><textarea rows="3" maxlength="1800" placeholder="否認理由を入力してください"></textarea><button class="send" data-id="'+esc(i.pageId)+'">否認を確定</button><button class="cancel">戻る</button></div>';
+    var status=i.state==='approved'?'<div class="row"><span class="k">承認者・日時</span><span>'+esc(i.approver||'')+'　'+esc(i.decidedAt||'')+'</span></div>':i.state==='rejected'?'<div class="row"><span class="k">否認者・日時</span><span>'+esc(i.rejecter||'')+'　'+esc(i.decidedAt||'')+'</span></div><div class="row"><span class="k">否認理由</span><span>'+esc(i.rejectionReason||'')+'</span></div>':'';
+    var applicantWarning=i.state==='pending'&&i.canOperate===false?'<div class="done err">'+esc(i.blockReason||'この申請は操作できません。管理者に確認してください。')+'</div>':'';
+    return '<article class="card" data-id="'+esc(i.pageId)+'" data-state="'+esc(i.state)+'" data-search="'+esc([i.name,i.store,i.content,i.reason].join(' ').toLowerCase())+'"><header><span class="badge '+esc(i.state)+'">'+esc(i.stateLabel)+'</span><span class="date">'+esc(i.createdAt||'')+'</span></header><h2>'+esc(i.name)+'</h2><div class="store">'+esc(i.store)+'</div><div class="row"><span class="k">自費の内容</span><span>'+esc(i.content)+'</span></div><div class="row"><span class="k">本来の価格（税込）</span><span>'+money(i.originalPrice)+'</span></div><div class="row"><span class="k">値引き後（税込）</span><span>'+money(i.discountedPrice)+'</span></div><div class="row"><span class="k">値引き額・率</span><span>'+money(i.discountAmount)+'　'+esc(i.discountRate||'')+'</span></div><details class="detail"><summary>申請理由</summary><p>'+esc(i.reason)+'</p></details>'+status+applicantWarning+actions+'</article>';
+  }
+  function render(){
+    var focused=targetPage&&items.find(function(i){return i.pageId===targetPage});if(focused&&focused.state!==tab)tab='all';
+    buildTabs();var visible=items.filter(function(i){return (tab==='all'||i.state===tab)&&(!query||[i.name,i.store,i.content,i.reason].join(' ').toLowerCase().indexOf(query)>=0)});
+    LIST.innerHTML=visible.map(card).join('');EMPTY.hidden=visible.length>0;bind();
+    if(targetPage){var el=Array.from(LIST.querySelectorAll('.card')).find(function(node){return node.dataset.id===targetPage});if(el){el.classList.add('focus');el.scrollIntoView({behavior:'smooth',block:'start'})}}
+  }
+  function sendAction(pageId,action,reason,cardEl){
+    var buttons=cardEl.querySelectorAll('button');buttons.forEach(function(b){b.disabled=true});
+    var box=document.createElement('div');box.className='done';box.textContent='処理中…';cardEl.appendChild(box);
+    fetch(ACTION_API,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:token,pageId:pageId,action:action,reason:reason||''})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok&&!j.message)j.message='処理できませんでした';return j})})
+      .then(function(j){if(j.ok){box.textContent=j.message||'処理を受け付けました';setTimeout(load,1200)}else{box.className='done err';box.textContent=j.message||'処理できませんでした';buttons.forEach(function(b){b.disabled=false})}})
+      .catch(function(){box.className='done err';box.textContent='通信エラーが発生しました';buttons.forEach(function(b){b.disabled=false})});
+  }
+  function bind(){LIST.querySelectorAll('.card').forEach(function(c){var ok=c.querySelector('.ok'),ng=c.querySelector('.ng'),r=c.querySelector('.reject');if(!ok)return;ok.onclick=function(){if(confirm('この申請を承認しますか？'))sendAction(ok.dataset.id,'approve','',c)};ng.onclick=function(){r.hidden=false;c.querySelector('.acts').hidden=true;r.querySelector('textarea').focus()};r.querySelector('.cancel').onclick=function(){r.hidden=true;c.querySelector('.acts').hidden=false};r.querySelector('.send').onclick=function(){var v=r.querySelector('textarea').value.trim();if(!v){alert('否認理由を入力してください');return}sendAction(ng.dataset.id,'reject',v,c)}})}
+  function load(){
+    if(!token){say('LINEログインが必要です');EMPTY.textContent='LINEでログインすると一覧を表示できます';EMPTY.hidden=false;return}
+    fetch(DATA_API,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:token,pageId:targetPage})})
+      .then(function(r){return r.json().then(function(j){if(!r.ok&&!j.message)j.message='一覧を取得できませんでした';return j})})
+      .then(function(j){if(!j.ok){items=[];render();EMPTY.textContent=j.message||'一覧を表示できません';EMPTY.hidden=false;say('閲覧できません');return}items=j.items||[];canAct=Boolean(j.canAct);truncated=Boolean(j.truncated);FOOT.textContent='更新 '+(j.updated||'')+(truncated?' / 100件を超えるため一覧は一部です':'');say(j.viewerName?j.viewerName+'（'+(canAct?'承認者':'閲覧のみ')+'）':(canAct?'承認者':'閲覧のみ'));render()})
+      .catch(function(){say('一覧を取得できませんでした');EMPTY.textContent='通信エラーが発生しました';EMPTY.hidden=false});
+  }
+  document.querySelector('.search').oninput=function(e){query=e.target.value.trim().toLowerCase();render()};
+  liff.init({liffId:LIFF_ID}).then(function(){
+    // LIFF URLの追加パラメータはSDK初期化後に読み取る。
+    var params=new URLSearchParams(location.search);var state=params.get('liff.state')||'';
+    if(state){var q=state.indexOf('?');params=new URLSearchParams(q>=0?state.slice(q+1):state)}
+    targetPage=params.get('page')||'';var requestedTab=params.get('tab')||'';if(['pending','approved','rejected','all'].indexOf(requestedTab)>=0)tab=requestedTab;
+    if(!liff.isLoggedIn()){liff.login({redirectUri:location.href});return}
+    token=liff.getIDToken()||'';if(!token){say('LINE IDトークンを取得できませんでした');return}
+    load();
+  }).catch(function(e){say('LINE連携エラー: '+(e&&(e.message||e.code)||'初期化できませんでした'))});
+})();
+</script>
+</body>
+</html>
