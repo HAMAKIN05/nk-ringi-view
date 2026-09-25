@@ -4,9 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-store">
+<script>
+try {
+  var liffState = new URLSearchParams(location.search).get('liff.state') || '';
+  if (/^\/discount\/index\.html(?:[?#]|$)/.test(liffState)) {
+    document.documentElement.classList.add('discount-liff-transition');
+  }
+} catch (_) {}
+</script>
 <title>NK稟議書 申請一覧</title>
 <style>
 :root{--bg:#f4f6f8;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--blue:#2563eb;--green:#059669;--red:#dc2626;--amber:#b45309}
+html.discount-liff-transition::before{content:"自費値引き申請一覧を開いています…";position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:var(--bg);color:var(--muted);font:15px -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+html.discount-liff-transition body>*{visibility:hidden!important}
 [hidden]{display:none!important}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:15px;line-height:1.5}
